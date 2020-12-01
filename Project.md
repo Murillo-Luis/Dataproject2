@@ -1,131 +1,140 @@
-Exploratory Data Analysis Project 2 (JHU) Coursera
-Unzipping and Loading Files
+title: "Reproducible Research Project 1"
+author: "Michael Galarnyk"
+date: "3/26/2017"
+output:
+  md_document:
+    variant: markdown_github
+---
+
+github repo for rest of specialization: [Data Science Coursera](https://github.com/mGalarnyk/datasciencecoursera)
+
+## Introduction
+It is now possible to collect a large amount of data about personal movement using activity monitoring devices such as a Fitbit, Nike Fuelband, or Jawbone Up. These type of devices are part of the “quantified self” movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. But these data remain under-utilized both because the raw data are hard to obtain and there is a lack of statistical methods and software for processing and interpreting the data.
+
+This assignment makes use of data from a personal activity monitoring device. This device collects data at 5 minute intervals through out the day. The data consists of two months of data from an anonymous individual collected during the months of October and November, 2012 and include the number of steps taken in 5 minute intervals each day.
+
+The data for this assignment can be downloaded from the course web site:
+
+* Dataset: [Activity monitoring data](https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip) 
+
+The variables included in this dataset are:
+
+steps: Number of steps taking in a 5-minute interval (missing values are coded as 𝙽𝙰) </br>
+date: The date on which the measurement was taken in YYYY-MM-DD format </br>
+interval: Identifier for the 5-minute interval in which measurement was taken </br>
+The dataset is stored in a comma-separated-value (CSV) file and there are a total of 17,568 observations in this dataset. 
+
+## Loading and preprocessing the data
+Unzip data to obtain a csv file.
+
+```{r}
 library("data.table")
-path <- getwd()
-download.file(url = "https://d396qusza40orc.cloudfront.net/exdata%2Fdata%2FNEI_data.zip"
-              , destfile = paste(path, "dataFiles.zip", sep = "/"))
-unzip(zipfile = "dataFiles.zip")
+library(ggplot2)
+fileUrl <- "https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip"
+download.file(fileUrl, destfile = paste0(getwd(), '/repdata%2Fdata%2Factivity.zip'), method = "curl")
+unzip("repdata%2Fdata%2Factivity.zip",exdir = "data")
+```
 
-SCC <- data.table::as.data.table(x = readRDS(file = "Source_Classification_Code.rds"))
-NEI <- data.table::as.data.table(x = readRDS(file = "summarySCC_PM25.rds"))
-Question 1 (plot1.R)
-Have total emissions from PM2.5 decreased in the United States from 1999 to 2008? Using the base plotting system, make a plot showing the total PM2.5 emission from all sources for each of the years 1999, 2002, 2005, and 2008.
+## Reading csv Data into Data.Table. 
+```{r}
+activityDT <- data.table::fread(input = "data/activity.csv")
+```
 
-# Prevents histogram from printing in scientific notation
-NEI[, Emissions := lapply(.SD, as.numeric), .SDcols = c("Emissions")]
+## What is mean total number of steps taken per day?
 
-totalNEI <- NEI[, lapply(.SD, sum, na.rm = TRUE), .SDcols = c("Emissions"), by = year]
+1. Calculate the total number of steps taken per day
 
-png(filename='plot1.png')
+```{r}
+Total_Steps <- activityDT[, c(lapply(.SD, sum, na.rm = FALSE)), .SDcols = c("steps"), by = .(date)] 
+head(Total_Steps, 10)
+```
 
-barplot(totalNEI[, Emissions]
-        , names = totalNEI[, year]
-        , xlab = "Years", ylab = "Emissions"
-        , main = "Emissions over the Years")
-        
-dev.off()
-Exploratory Data Analysis Project 2 question 1
+2. If you do not understand the difference between a histogram and a barplot, research the difference between them. Make a histogram of the total number of steps taken each day. 
 
-Question 2 (plot2.R)
-Have total emissions from PM2.5 decreased in the Baltimore City, Maryland (𝚏𝚒𝚙𝚜 == "𝟸𝟺𝟻𝟷𝟶") from 1999 to 2008? Use the base plotting system to make a plot answering this question.
+```{r}
+ggplot(Total_Steps, aes(x = steps)) +
+    geom_histogram(fill = "blue", binwidth = 1000) +
+    labs(title = "Daily Steps", x = "Steps", y = "Frequency")
+```
 
-NEI[, Emissions := lapply(.SD, as.numeric), .SDcols = c("Emissions")]
-totalNEI <- NEI[fips=='24510', lapply(.SD, sum, na.rm = TRUE)
-                , .SDcols = c("Emissions")
-                , by = year]
+3. Calculate and report the mean and median of the total number of steps taken per day
+```{r}
+Total_Steps[, .(Mean_Steps = mean(steps, na.rm = TRUE), Median_Steps = median(steps, na.rm = TRUE))]
+```
 
-png(filename='plot2.png')
+## What is the average daily activity pattern?
 
-barplot(totalNEI[, Emissions]
-        , names = totalNEI[, year]
-        , xlab = "Years", ylab = "Emissions"
-        , main = "Emissions over the Years")
+1. Make a time series plot (i.e. 𝚝𝚢𝚙𝚎 = "𝚕") of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all days (y-axis)
 
-dev.off()
-Exploratory Data Analysis Project 2 question 2
+```{r}
+IntervalDT <- activityDT[, c(lapply(.SD, mean, na.rm = TRUE)), .SDcols = c("steps"), by = .(interval)] 
+ggplot(IntervalDT, aes(x = interval , y = steps)) + geom_line(color="blue", size=1) + labs(title = "Avg. Daily Steps", x = "Interval", y = "Avg. Steps per day")
+```
 
-Question 3 (plot3.R)
-Of the four types of sources indicated by the 𝚝𝚢𝚙𝚎 (point, nonpoint, onroad, nonroad) variable, which of these four sources have seen decreases in emissions from 1999–2008 for Baltimore City? Which have seen increases in emissions from 1999–2008? Use the ggplot2 plotting system to make a plot answer this question.
+2. Which 5-minute interval, on average across all the days in the dataset, contains the maximum number of steps?
 
-# Subset NEI data by Baltimore
-baltimoreNEI <- NEI[fips=="24510",]
+```{r}
+IntervalDT[steps == max(steps), .(max_interval = interval)]
+```
 
-png("plot3.png")
 
-ggplot(baltimoreNEI,aes(factor(year),Emissions,fill=type)) +
-  geom_bar(stat="identity") +
-  facet_grid(.~type,scales = "free",space="free") + 
-  labs(x="year", y=expression("Total PM"[2.5]*" Emission (Tons)")) + 
-  labs(title=expression("PM"[2.5]*" Emissions, Baltimore City 1999-2008 by Source Type"))
+## Imputing missing values
 
-dev.off()
-Exploratory Data Analysis Project 2 question 3
+1. Calculate and report the total number of missing values in the dataset (i.e. the total number of rows with 𝙽𝙰s)
 
-Question 4 (plot4.R)
-Across the United States, how have emissions from coal combustion-related sources changed from 1999–2008?
+```{r}
+activityDT[is.na(steps), .N ]
+# alternative solution
+nrow(activityDT[is.na(steps),])
+```
 
-# Subset coal combustion related NEI data
-combustionRelated <- grepl("comb", SCC[, SCC.Level.One], ignore.case=TRUE)
-coalRelated <- grepl("coal", SCC[, SCC.Level.Four], ignore.case=TRUE) 
-combustionSCC <- SCC[combustionRelated & coalRelated, SCC]
-combustionNEI <- NEI[NEI[,SCC] %in% combustionSCC]
+2. Devise a strategy for filling in all of the missing values in the dataset. The strategy does not need to be sophisticated. For example, you could use the mean/median for that day, or the mean for that 5-minute interval, etc.
 
-png("plot4.png")
+```{r}
+# Filling in missing values with median of dataset. 
+activityDT[is.na(steps), "steps"] <- activityDT[, c(lapply(.SD, median, na.rm = TRUE)), .SDcols = c("steps")]
+```
 
-ggplot(combustionNEI,aes(x = factor(year),y = Emissions/10^5)) +
-  geom_bar(stat="identity", fill ="#FF9999", width=0.75) +
-  labs(x="year", y=expression("Total PM"[2.5]*" Emission (10^5 Tons)")) + 
-  labs(title=expression("PM"[2.5]*" Coal Combustion Source Emissions Across US from 1999-2008"))
+3. Create a new dataset that is equal to the original dataset but with the missing data filled in.
 
-dev.off()
-Exploratory Data Analysis Project 2 question 4
+```{r}
+data.table::fwrite(x = activityDT, file = "data/tidyData.csv", quote = FALSE)
+```
 
-Question 5 (plot5.R)
-How have emissions from motor vehicle sources changed from 1999–2008 in Baltimore City?
+4. Make a histogram of the total number of steps taken each day and calculate and report the mean and median total number of steps taken per day. Do these values differ from the estimates from the first part of the assignment? What is the impact of imputing missing data on the estimates of the total daily number of steps?
 
-# Gather the subset of the NEI data which corresponds to vehicles
-condition <- grepl("vehicle", SCC[, SCC.Level.Two], ignore.case=TRUE)
-vehiclesSCC <- SCC[condition, SCC]
-vehiclesNEI <- NEI[NEI[, SCC] %in% vehiclesSCC,]
+```{r}
+# total number of steps taken per day
+Total_Steps <- activityDT[, c(lapply(.SD, sum)), .SDcols = c("steps"), by = .(date)] 
+# mean and median total number of steps taken per day
+Total_Steps[, .(Mean_Steps = mean(steps), Median_Steps = median(steps))]
+ggplot(Total_Steps, aes(x = steps)) + geom_histogram(fill = "blue", binwidth = 1000) + labs(title = "Daily Steps", x = "Steps", y = "Frequency")
+```
 
-# Subset the vehicles NEI data to Baltimore's fip
-baltimoreVehiclesNEI <- vehiclesNEI[fips=="24510",]
+Type of Estimate | Mean_Steps | Median_Steps
+--- | --- | ---
+First Part (with na) | 10765 | 10765
+Second Part (fillin in na with median) | 9354.23 | 10395
 
-png("plot5.png")
+## Are there differences in activity patterns between weekdays and weekends?
 
-ggplot(baltimoreVehiclesNEI,aes(factor(year),Emissions)) +
-  geom_bar(stat="identity", fill ="#FF9999" ,width=0.75) +
-  labs(x="year", y=expression("Total PM"[2.5]*" Emission (10^5 Tons)")) + 
-  labs(title=expression("PM"[2.5]*" Motor Vehicle Source Emissions in Baltimore from 1999-2008"))
+1. Create a new factor variable in the dataset with two levels – “weekday” and “weekend” indicating whether a given date is a weekday or weekend day.
 
-dev.off()
-Exploratory Data Analysis Project 2 question 5
+```{r}
+# Just recreating activityDT from scratch then making the new factor variable. (No need to, just want to be clear on what the entire process is.) 
+activityDT <- data.table::fread(input = "data/activity.csv")
+activityDT[, date := as.POSIXct(date, format = "%Y-%m-%d")]
+activityDT[, `Day of Week`:= weekdays(x = date)]
+activityDT[grepl(pattern = "Monday|Tuesday|Wednesday|Thursday|Friday", x = `Day of Week`), "weekday or weekend"] <- "weekday"
+activityDT[grepl(pattern = "Saturday|Sunday", x = `Day of Week`), "weekday or weekend"] <- "weekend"
+activityDT[, `weekday or weekend` := as.factor(`weekday or weekend`)]
+head(activityDT, 10)
+```
 
-Question 6 (plot6.R)
-Compare emissions from motor vehicle sources in Baltimore City with emissions from motor vehicle sources in Los Angeles County, California (𝚏𝚒𝚙𝚜 == "𝟶𝟼𝟶𝟹𝟽"). Which city has seen greater changes over time in motor vehicle emissions?
+2. Make a panel plot containing a time series plot (i.e. 𝚝𝚢𝚙𝚎 = "𝚕") of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all weekday days or weekend days (y-axis). See the README file in the GitHub repository to see an example of what this plot should look like using simulated data.
 
-# Gather the subset of the NEI data which corresponds to vehicles
-condition <- grepl("vehicle", SCC[, SCC.Level.Two], ignore.case=TRUE)
-vehiclesSCC <- SCC[condition, SCC]
-vehiclesNEI <- NEI[NEI[, SCC] %in% vehiclesSCC,]
-
-# Subset the vehicles NEI data by each city's fip and add city name.
-vehiclesBaltimoreNEI <- vehiclesNEI[fips == "24510",]
-vehiclesBaltimoreNEI[, city := c("Baltimore City")]
-
-vehiclesLANEI <- vehiclesNEI[fips == "06037",]
-vehiclesLANEI[, city := c("Los Angeles")]
-
-# Combine data.tables into one data.table
-bothNEI <- rbind(vehiclesBaltimoreNEI,vehiclesLANEI)
-
-png("plot6.png")
-
-ggplot(bothNEI, aes(x=factor(year), y=Emissions, fill=city)) +
-  geom_bar(aes(fill=year),stat="identity") +
-  facet_grid(scales="free", space="free", .~city) +
-  labs(x="year", y=expression("Total PM"[2.5]*" Emission (Kilo-Tons)")) + 
-  labs(title=expression("PM"[2.5]*" Motor Vehicle Source Emissions in Baltimore & LA, 1999-2008"))
-
-dev.off()
-Exploratory Data Analysis Project 2 question 6
+```{r}
+activityDT[is.na(steps), "steps"] <- activityDT[, c(lapply(.SD, median, na.rm = TRUE)), .SDcols = c("steps")]
+IntervalDT <- activityDT[, c(lapply(.SD, mean, na.rm = TRUE)), .SDcols = c("steps"), by = .(interval, `weekday or weekend`)] 
+ggplot(IntervalDT , aes(x = interval , y = steps, color=`weekday or weekend`)) + geom_line() + labs(title = "Avg. Daily Steps by Weektype", x = "Interval", y = "No. of Steps") + facet_wrap(~`weekday or weekend` , ncol = 1, nrow=2)
+```
